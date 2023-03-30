@@ -2,16 +2,9 @@ import { type FormEvent, useRef, useState } from "react";
 import { type NextPage } from "next";
 import Head from "next/head";
 
-import { Configuration, OpenAIApi } from "openai";
-
-interface ChatMessage {
-  content: string;
-  role: string;
-}
-
-const openai = new OpenAIApi(
-  new Configuration({ apiKey: process.env.NEXT_PUBLIC_GPT_API_KEY })
-);
+import { openai } from "~/utils/openai";
+import { type ChatMessage } from "~/types/openaiInterfaces";
+import Spinner from "~/components/Spinner";
 
 const Home: NextPage = () => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -25,18 +18,21 @@ const Home: NextPage = () => {
   const onSendMessage = (e: FormEvent<HTMLFormElement>) => {
     toggleLoading(true);
     e.preventDefault();
+
     if (!inputRef.current) return;
-    addNewMessages([{ role: "user", content: inputRef.current.value }]);
+    const newUserMessage: ChatMessage = {
+      role: "user",
+      content: inputRef.current.value,
+    };
+    addNewMessages([newUserMessage]);
+    inputRef.current.value = "";
 
     openai
       .createChatCompletion({
         model: "gpt-3.5-turbo",
-        messages: [{ role: "user", content: inputRef.current?.value ?? "" }],
+        messages: [...messages, newUserMessage],
       })
       .then((res) => {
-        if (!inputRef.current) return;
-        inputRef.current.value = "";
-
         addNewMessages(
           res.data.choices.map((choice) => choice.message as ChatMessage)
         );
@@ -55,18 +51,40 @@ const Home: NextPage = () => {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
-      <div>
-        <h1>Local GPT</h1>
-        <form onSubmit={onSendMessage}>
-          <input type="text" placeholder="Write here..." ref={inputRef} />
-          <button disabled={isLoading}>send</button>
-
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="mb-4 text-3xl font-bold">Local GPT</h1>
+        <div className="mt-4">
           {messages.map((m) => (
-            <p key={m.content}>
+            <p
+              key={m.content}
+              className={`${
+                m.role === "assistant"
+                  ? "ml-10 bg-green-500"
+                  : "mr-10 bg-blue-500"
+              } mb-2 rounded-lg px-4 py-2 text-white`}
+            >
               {m.role}: {m.content}
             </p>
           ))}
-          {isLoading && <p>Loading...</p>}
+        </div>
+        {isLoading && (
+          <div className="mt-4">
+            <Spinner />
+          </div>
+        )}
+        <form className="mt-4 flex" onSubmit={onSendMessage}>
+          <input
+            className="mr-2 flex-grow rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            type="text"
+            placeholder="Write here..."
+            ref={inputRef}
+          />
+          <button
+            className="rounded-lg bg-blue-500 px-4 py-2 text-white"
+            disabled={isLoading}
+          >
+            send
+          </button>
         </form>
       </div>
     </>
